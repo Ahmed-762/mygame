@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>لعبة سوبر ماريو - تعمل على الهاتف تماماً</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+    <style>
+        body { margin:0; padding:0; background:#87CEEB; overflow:hidden; touch-action: none; }
+    </style>
+</head>
+<body>
+<script>
+    const config = {
+        type: Phaser.AUTO,
+        width: 1024,
+        height: 600,
+        scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+        input: { activePointers: 4 }, // دعم اللمس المتعدد (الأهم!)
+        physics: { default: 'arcade', arcade: { gravity: { y: 1200 } } },
+        scene: { preload, create, update }
+    };
+
+    const game = new Phaser.Game(config);
+
+    let player, platforms, enemies, coins, score = 0, scoreText;
+    let gameOver = false;
+    const worldWidth = 4000;
+
+    // حالة الأزرار
+    const keys = { left: false, right: false, jump: false };
+
+    function preload() {}
+
+    function create() {
+        this.cameras.main.setBackgroundColor('#87CEEB');
+        this.physics.world.setBounds(0, 0, worldWidth, 600);
+        this.cameras.main.setBounds(0, 0, worldWidth, 600);
+
+        // الأرض والمنصات
+        platforms = this.physics.add.staticGroup();
+        platforms.add(this.add.rectangle(2000, 580, worldWidth, 40, 0x228B22).setOrigin(0.5,0.5));
+        [600,1200,1800,2500,3200].forEach((x,i) => {
+            let y = 450 - i*50;
+            let w = 150 + i*20;
+            platforms.add(this.add.rectangle(x, y, w, 20, 0x32CD32).setOrigin(0.5,0.5));
+        });
+        platforms.children.entries.forEach(p => this.physics.add.existing(p, true));
+
+        // اللاعب
+        player = this.add.rectangle(100, 450, 32, 48, 0xFF4444).setOrigin(0.5,0.5);
+        this.physics.add.existing(player);
+        player.body.setBounce(0.1);
+
+        // الأعداء
+        enemies = this.physics.add.group();
+        [800,1500,2200,3000].forEach((x,i) => {
+            let e = this.add.rectangle(x, 500 - i*100, 32, 32, 0x8B4513).setOrigin(0.5,0.5);
+            this.physics.add.existing(e);
+            e.body.setVelocityX(i%2===0 ? -80 : 80);
+            enemies.add(e);
+        });
+
+        // العملات (ثابتة)
+        coins = this.physics.add.group();
+        [650,1250,1900,2600,3300].forEach((x,i) => {
+            let c = this.add.circle(x, 400 - i*50, 12, 0xFFD700);
+            this.physics.add.existing(c);
+            c.body.setCircle(12);
+            c.body.allowGravity = false;
+            c.body.immovable = true;
+            coins.add(c);
+        });
+
+        // النتيجة
+        this.add.rectangle(16, 32, 220, 45, 0xFFFFFF, 0.8).setOrigin(0,0).setScrollFactor(0);
+        scoreText = this.add.text(30, 16, 'النتيجة: 0', {fontSize:'28px', fill:'#000'}).setScrollFactor(0);
+
+        // أزرار اللمس (شفافة + دعم متعدد اللمس)
+        const btnStyle = { alpha: 0.6 };
+
+        // يسار
+        let leftBtn = this.add.rectangle(120, 540, 100, 120, 0x6666ff, btnStyle.alpha).setInteractive().setScrollFactor(0);
+        this.add.text(120, 510, '←', {fontSize:'60px', color:'#fff'}).setScrollFactor(0);
+        leftBtn.on('pointerdown', () => keys.left = true);
+        leftBtn.on('pointerup', () => keys.left = false);
+        leftBtn.on('pointerout', () => keys.left = false);
+
+        // يمين
+        let rightBtn = this.add.rectangle(250, 540, 100, 120, 0x66ff66, btnStyle.alpha).setInteractive().setScrollFactor(0);
+        this.add.text(250, 510, '→', {fontSize:'60px', color:'#fff'}).setScrollFactor(0);
+        rightBtn.on('pointerdown', () => keys.right = true);
+        rightBtn.on('pointerup', () => keys.right = false);
+        rightBtn.on('pointerout', () => keys.right = false);
+
+        // قفز
+        let jumpBtn = this.add.circle(900, 540, 70, 0xff4444, btnStyle.alpha).setInteractive().setScrollFactor(0);
+        this.add.text(900, 500, '↑', {fontSize:'50px', color:'#fff'}).setOrigin(0.5).setScrollFactor(0);
+        jumpBtn.on('pointerdown', () => keys.jump = true);
+        jumpBtn.on('pointerup', () => keys.jump = false);
+        jumpBtn.on('pointerout', () => keys.jump = false);
+
+        // كيبورد (للكمبيوتر)
+        this.input.keyboard.on('keydown', e => {
+            if (e.code === 'ArrowLeft') keys.left = true;
+            if (e.code === 'ArrowRight') keys.right = true;
+            if (e.code === 'ArrowUp' || e.code === 'Space') keys.jump = true;
+        });
+        this.input.keyboard.on('keyup', e => {
+            if (e.code === 'ArrowLeft') keys.left = false;
+            if (e.code === 'ArrowRight') keys.right = false;
+            if (e.code === 'ArrowUp' || e.code === 'Space') keys.jump = false;
+        });
+
+        // التصادمات
+        this.physics.add.collider(player, platforms);
+        this.physics.add.collider(enemies, platforms);
+        this.physics.add.overlap(player, coins, (p,c) => { c.destroy(); score += 10; scoreText.setText('النتيجة: '+score); });
+        this.physics.add.overlap(player, enemies, hitEnemy, null, this);
+
+        this.cameras.main.startFollow(player);
+    }
+
+    function update() {
+        if (gameOver) return;
+
+        // الحركة
+        if (keys.left) player.body.setVelocityX(-220);
+        else if (keys.right) player.body.setVelocityX(220);
+        else player.body.setVelocityX(0);
+
+        if (keys.left) player.flipX = true;
+        else if (keys.right) player.flipX = false;
+
+        // القفز
+        if (keys.jump && player.body.touching.down) {
+            player.body.setVelocityY(-580);
+            keys.jump = false; // قفزة واحدة لكل ضغطة
+        }
+
+        // حركة الأعداء
+        enemies.children.entries.forEach(e => {
+            if (e.body.blocked.left || e.body.blocked.right) {
+                e.body.velocity.x *= -1;
+            }
+        });
+
+        // الفوز
+        if (player.x > worldWidth - 150) {
+            this.physics.pause();
+            this.add.text(512, 250, 'فزت!', {fontSize:'80px', color:'#FFD700'}).setOrigin(0.5).setScrollFactor(0);
+            this.add.text(512, 350, 'اضغط هنا لإعادة اللعب', {fontSize:'40px', backgroundColor:'#fff', padding:{x:20,y:10}})
+                .setOrigin(0.5).setScrollFactor(0).setInteractive()
+                .on('pointerup', () => location.reload());
+            gameOver = true;
+        }
+    }
+
+    function hitEnemy(p, e) {
+        if (p.body.touching.down && p.y < e.y - 20) {
+            e.destroy();
+            p.body.setVelocityY(-400);
+            score += 100;
+            scoreText.setText('النتيجة: '+score);
+        } else {
+            this.physics.pause();
+            this.add.text(512, 250, 'انتهت اللعبة!', {fontSize:'60px', color:'#ff0000'}).setOrigin(0.5).setScrollFactor(0);
+            this.add.text(512, 350, 'اضغط لإعادة اللعب', {fontSize:'40px', backgroundColor:'#fff', padding:{x:20,y:10}})
+                .setOrigin(0.5).setScrollFactor(0).setInteractive()
+                .on('pointerup', () => location.reload());
+            gameOver = true;
+        }
+    }
+</script>
+</body>
+</html>

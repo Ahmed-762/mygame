@@ -2,175 +2,496 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>لعبة سوبر ماريو - تعمل على الهاتف تماماً</title>
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ماريو - الذهب اللامع</title>
     <style>
-        body { margin:0; padding:0; background:#87CEEB; overflow:hidden; touch-action: none; }
+        body {
+            background-color: #000;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            touch-action: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            width: 100vw;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #game-wrapper {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        canvas {
+            display: block;
+            background-color: #5c94fc;
+            image-rendering: pixelated; 
+        }
+
+        #ui {
+            position: absolute;
+            top: 2%;
+            left: 2%;
+            font-size: 3vmin;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 0 #000;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #start-screen {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            color: white;
+        }
+        
+        #start-btn {
+            padding: 15px 40px;
+            font-size: 4vmin;
+            background: linear-gradient(to bottom, #FFD700, #DAA520);
+            color: #4a2500;
+            border: 3px solid #fff;
+            border-radius: 50px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            margin-top: 20px;
+            box-shadow: 0 0 15px #FFD700;
+        }
+        #start-btn:hover { transform: scale(1.05); }
+
+        #mobile-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            height: 120px;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 40px;
+            box-sizing: border-box;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .control-group {
+            pointer-events: auto;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .btn {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            color: white;
+            font-size: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            backdrop-filter: blur(4px);
+        }
+
+        .btn:active, .btn.pressed {
+            background: rgba(255, 255, 255, 0.5);
+            transform: scale(0.9);
+        }
+
+        @media (max-height: 500px) {
+            .btn { width: 60px; height: 60px; font-size: 30px; }
+            #mobile-controls { height: 80px; padding: 0 20px; }
+        }
     </style>
 </head>
 <body>
+
+    <div id="game-wrapper">
+        <canvas id="canvas" width="1280" height="720"></canvas>
+        
+        <div id="ui">
+            المستوى: <span id="level-display">1</span> | 💰: <span id="coin-display">0</span>
+        </div>
+
+        <div id="start-screen">
+            <h1 style="font-size: 6vmin; margin: 0; color: #FFD700; text-shadow: 0 0 20px orange;">جمع الذهب</h1>
+            <button id="start-btn">ابدأ المغامرة</button>
+        </div>
+    </div>
+
+    <div id="mobile-controls">
+        <div class="control-group">
+            <div class="btn" id="btn-jump" style="background: rgba(231, 76, 60, 0.4);">▲</div>
+        </div>
+        <div class="control-group">
+            <div class="btn" id="btn-right">▶</div>
+            <div class="btn" id="btn-left">◀</div>
+            
+        </div>
+        
+    </div>
+
 <script>
-    const config = {
-        type: Phaser.AUTO,
-        width: 1024,
-        height: 600,
-        scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-        input: { activePointers: 4 }, // دعم اللمس المتعدد (الأهم!)
-        physics: { default: 'arcade', arcade: { gravity: { y: 1200 } } },
-        scene: { preload, create, update }
-    };
+(function () {
+    var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame;
+    window.requestAnimationFrame = requestAnimationFrame;
 
-    const game = new Phaser.Game(config);
+    var canvas = document.getElementById("canvas"),
+        ctx = canvas.getContext("2d"),
+        gameWrapper = document.getElementById("game-wrapper"),
+        gameWidth = 1280,
+        gameHeight = 720;
 
-    let player, platforms, enemies, coins, score = 0, scoreText;
-    let gameOver = false;
-    const worldWidth = 4000;
+    var player = {
+            x: 100, y: gameHeight - 100, width: 30, height: 30,
+            speed: 7, velX: 0, velY: 0, jumping: false, grounded: false, color: '#E70011'
+        },
+        keys = [],
+        friction = 0.85,
+        gravity = 0.5,
+        coins = [],
+        boxes = [],
+        clouds = [],
+        door = {},
+        currentLevel = 0,
+        score = 0,
+        gameRunning = false;
 
-    // حالة الأزرار
-    const keys = { left: false, right: false, jump: false };
+    // --- نظام التحجيم ---
+    function resizeGame() {
+        var windowWidth = window.innerWidth;
+        var windowHeight = window.innerHeight;
+        var scale = Math.min(windowWidth / gameWidth, windowHeight / gameHeight);
+        var newWidth = gameWidth * scale;
+        var newHeight = gameHeight * scale;
+        gameWrapper.style.width = newWidth + "px";
+        gameWrapper.style.height = newHeight + "px";
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
+    }
+    window.addEventListener("resize", resizeGame);
+    resizeGame();
 
-    function preload() {}
+    // --- خرائط المراحل ---
+    var levels = [
+        [
+            "########################################",
+            "#                                      #",
+            "#                                      #",
+            "#                                      #",
+            "#                  OO                  #",
+            "#                 ####                 #",
+            "#                                      #",
+            "#         OO              OO           #",
+            "#        ####            ####          #",
+            "#                                      #",
+            "#                                      #",
+            "#      ####                ####        #",
+            "#                                      #",
+            "#             OO  OO  OO               #",
+            "#            ############              #",
+            "#                                      #",
+            "#                                     D#",
+            "#    @                              ####",
+            "#  #####     ###      ###     ##########",
+            "#                                      #",
+            "#                                      #",
+            "########################################"
+        ],
+        [
+            "########################################",
+            "#D                                     #",
+            "#####                                  #",
+            "#                                      #",
+            "#            OO      OO     OO         #",
+            "#           ####    ####   ####        #",
+            "#                                      #",
+            "#      OO                              #",
+            "#     ####                             #",
+            "#                                      #",
+            "#            ####   ####   ####        #",
+            "#                                      #",
+            "#       OO                             #",
+            "#      ####                            #",
+            "#             !      !      !          #",
+            "#            ###    ###    ###         #",
+            "#                                      #",
+            "# @     !                        !     #",
+            "########################################",
+            "#                                      #",
+            "#                                      #",
+            "########################################"
+        ],
+        [
+            "########################################",
+            "##################################### D#",
+            "#OO   #   OO      #        OO       ####",
+            "####  #  ####     #       ####         #",
+            "#     #           #                    #",
+            "#     #      ######      #######       #",
+            "#  @  #      #    #      #     #       #",
+            "#######      #    #      #     #       #",
+            "#            #    #      #     #   OO  #",
+            "#      #######    #      #     #  #### #",
+            "#      #          #      #     #       #",
+            "#  OO  #     ######      #     #       #",
+            "# #### #     #    #      #     #       #",
+            "#      #     # OO #      #     #       #",
+            "#      #     ######      #     #       #",
+            "#      #                 #     #       #",
+            "#      ###################     #       #",
+            "#                              #       #",
+            "########################################",
+            "#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!#",
+            "########################################",
+            "########################################"
+        ],
+        [
+            "########################################",
+            "#                                      #",
+            "#                 OO                   #",
+            "#                ####                  #",
+            "#                                      #",
+            "#          OO          OO              #",
+            "#         ####        ####             #",
+            "#                                      #",
+            "#    OO                          OO    #",
+            "#   ####                        ####   #",
+            "#                                      #",
+            "#             CONGRATULATIONS          #",
+            "#            YOU WON THE GAME          #",
+            "#                                      #",
+            "#                  D                   #",
+            "#                 ###                  #",
+            "#                                      #",
+            "# @                                    #",
+            "########################################",
+            "########################################",
+            "########################################",
+            "########################################"
+        ]
+    ];
 
-    function create() {
-        this.cameras.main.setBackgroundColor('#87CEEB');
-        this.physics.world.setBounds(0, 0, worldWidth, 600);
-        this.cameras.main.setBounds(0, 0, worldWidth, 600);
+    function startGame() {
+        var elem = document.documentElement;
+        if (elem.requestFullscreen) elem.requestFullscreen();
+        else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+        document.getElementById('start-screen').style.display = 'none';
+        gameRunning = true;
+        initLevel(0);
+        update();
+    }
+    document.getElementById('start-btn').addEventListener('click', startGame);
 
-        // الأرض والمنصات
-        platforms = this.physics.add.staticGroup();
-        platforms.add(this.add.rectangle(2000, 580, worldWidth, 40, 0x228B22).setOrigin(0.5,0.5));
-        [600,1200,1800,2500,3200].forEach((x,i) => {
-            let y = 450 - i*50;
-            let w = 150 + i*20;
-            platforms.add(this.add.rectangle(x, y, w, 20, 0x32CD32).setOrigin(0.5,0.5));
-        });
-        platforms.children.entries.forEach(p => this.physics.add.existing(p, true));
+    function initLevel(lvlIndex) {
+        if (lvlIndex >= levels.length) {
+            alert("مبروك! أنهيت اللعبة. النقاط: " + score);
+            currentLevel = 0; score = 0; lvlIndex = 0;
+        }
 
-        // اللاعب
-        player = this.add.rectangle(100, 450, 32, 48, 0xFF4444).setOrigin(0.5,0.5);
-        this.physics.add.existing(player);
-        player.body.setBounce(0.1);
+        document.getElementById('level-display').innerText = lvlIndex + 1;
+        document.getElementById('coin-display').innerText = score;
 
-        // الأعداء
-        enemies = this.physics.add.group();
-        [800,1500,2200,3000].forEach((x,i) => {
-            let e = this.add.rectangle(x, 500 - i*100, 32, 32, 0x8B4513).setOrigin(0.5,0.5);
-            this.physics.add.existing(e);
-            e.body.setVelocityX(i%2===0 ? -80 : 80);
-            enemies.add(e);
-        });
+        boxes = []; coins = []; clouds = [];
+        
+        var levelMap = levels[lvlIndex];
+        var tileSizeX = gameWidth / levelMap[0].length; 
+        var tileSizeY = gameHeight / levelMap.length;
 
-        // العملات (ثابتة)
-        coins = this.physics.add.group();
-        [650,1250,1900,2600,3300].forEach((x,i) => {
-            let c = this.add.circle(x, 400 - i*50, 12, 0xFFD700);
-            this.physics.add.existing(c);
-            c.body.setCircle(12);
-            c.body.allowGravity = false;
-            c.body.immovable = true;
-            coins.add(c);
-        });
+        for (var i = 0; i < levelMap.length; i++) {
+            for (var j = 0; j < levelMap[i].length; j++) {
+                var type = levelMap[i][j];
+                var x = j * tileSizeX;
+                var y = i * tileSizeY;
 
-        // النتيجة
-        this.add.rectangle(16, 32, 220, 45, 0xFFFFFF, 0.8).setOrigin(0,0).setScrollFactor(0);
-        scoreText = this.add.text(30, 16, 'النتيجة: 0', {fontSize:'28px', fill:'#000'}).setScrollFactor(0);
-
-        // أزرار اللمس (شفافة + دعم متعدد اللمس)
-        const btnStyle = { alpha: 0.6 };
-
-        // يسار
-        let leftBtn = this.add.rectangle(120, 540, 100, 120, 0x6666ff, btnStyle.alpha).setInteractive().setScrollFactor(0);
-        this.add.text(120, 510, '←', {fontSize:'60px', color:'#fff'}).setScrollFactor(0);
-        leftBtn.on('pointerdown', () => keys.left = true);
-        leftBtn.on('pointerup', () => keys.left = false);
-        leftBtn.on('pointerout', () => keys.left = false);
-
-        // يمين
-        let rightBtn = this.add.rectangle(250, 540, 100, 120, 0x66ff66, btnStyle.alpha).setInteractive().setScrollFactor(0);
-        this.add.text(250, 510, '→', {fontSize:'60px', color:'#fff'}).setScrollFactor(0);
-        rightBtn.on('pointerdown', () => keys.right = true);
-        rightBtn.on('pointerup', () => keys.right = false);
-        rightBtn.on('pointerout', () => keys.right = false);
-
-        // قفز
-        let jumpBtn = this.add.circle(900, 540, 70, 0xff4444, btnStyle.alpha).setInteractive().setScrollFactor(0);
-        this.add.text(900, 500, '↑', {fontSize:'50px', color:'#fff'}).setOrigin(0.5).setScrollFactor(0);
-        jumpBtn.on('pointerdown', () => keys.jump = true);
-        jumpBtn.on('pointerup', () => keys.jump = false);
-        jumpBtn.on('pointerout', () => keys.jump = false);
-
-        // كيبورد (للكمبيوتر)
-        this.input.keyboard.on('keydown', e => {
-            if (e.code === 'ArrowLeft') keys.left = true;
-            if (e.code === 'ArrowRight') keys.right = true;
-            if (e.code === 'ArrowUp' || e.code === 'Space') keys.jump = true;
-        });
-        this.input.keyboard.on('keyup', e => {
-            if (e.code === 'ArrowLeft') keys.left = false;
-            if (e.code === 'ArrowRight') keys.right = false;
-            if (e.code === 'ArrowUp' || e.code === 'Space') keys.jump = false;
-        });
-
-        // التصادمات
-        this.physics.add.collider(player, platforms);
-        this.physics.add.collider(enemies, platforms);
-        this.physics.add.overlap(player, coins, (p,c) => { c.destroy(); score += 10; scoreText.setText('النتيجة: '+score); });
-        this.physics.add.overlap(player, enemies, hitEnemy, null, this);
-
-        this.cameras.main.startFollow(player);
+                if (type === '#') {
+                    boxes.push({ x: x, y: y, width: tileSizeX, height: tileSizeY, type: 'ground' });
+                } else if (type === '!') {
+                    boxes.push({ x: x, y: y + (tileSizeY/2), width: tileSizeX, height: tileSizeY/2, type: 'lava' });
+                } else if (type === 'O') {
+                    // حجم العملة الفعلي للتصادم
+                    coins.push({ x: x + 10, y: y + 10, width: tileSizeX - 20, height: tileSizeY - 20, collected: false });
+                } else if (type === 'D') {
+                    door = { x: x, y: y, width: tileSizeX, height: tileSizeY };
+                } else if (type === '@') {
+                    player.x = x; player.y = y; player.velX = 0; player.velY = 0;
+                }
+            }
+        }
+        
+        for(var c=0; c<10; c++){
+            clouds.push({ x: Math.random() * gameWidth, y: Math.random() * (gameHeight/2), size: Math.random() * 40 + 30, speed: Math.random() * 0.5 + 0.1 });
+        }
     }
 
     function update() {
-        if (gameOver) return;
+        if(!gameRunning) return;
 
-        // الحركة
-        if (keys.left) player.body.setVelocityX(-220);
-        else if (keys.right) player.body.setVelocityX(220);
-        else player.body.setVelocityX(0);
-
-        if (keys.left) player.flipX = true;
-        else if (keys.right) player.flipX = false;
-
-        // القفز
-        if (keys.jump && player.body.touching.down) {
-            player.body.setVelocityY(-580);
-            keys.jump = false; // قفزة واحدة لكل ضغطة
+        if (keys[38] || keys[32]) { 
+            if (!player.jumping && player.grounded) {
+                player.jumping = true; player.grounded = false;
+                player.velY = -player.speed * 2.3;
+            }
         }
+        if (keys[39]) { if (player.velX < player.speed) player.velX++; }
+        if (keys[37]) { if (player.velX > -player.speed) player.velX--; }
 
-        // حركة الأعداء
-        enemies.children.entries.forEach(e => {
-            if (e.body.blocked.left || e.body.blocked.right) {
-                e.body.velocity.x *= -1;
+        player.velX *= friction;
+        player.velY += gravity;
+
+        // الخلفية
+        ctx.fillStyle = (currentLevel === 2) ? "#333" : "#5c94fc";
+        ctx.fillRect(0, 0, gameWidth, gameHeight);
+
+        // الغيوم
+        ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+        clouds.forEach(function(cloud){
+            ctx.beginPath();
+            ctx.arc(cloud.x, cloud.y, cloud.size, 0, Math.PI*2);
+            ctx.arc(cloud.x + cloud.size*0.6, cloud.y - cloud.size*0.4, cloud.size*0.8, 0, Math.PI*2);
+            ctx.fill();
+            cloud.x += cloud.speed;
+            if(cloud.x > gameWidth + 100) cloud.x = -100;
+        });
+
+        // الأرضية (الصناديق البنية)
+        boxes.forEach(function(box) {
+            ctx.beginPath();
+            if(box.type === 'lava') {
+                ctx.fillStyle = "#ff0000";
+                ctx.rect(box.x, box.y + Math.sin(Date.now()/200)*3, box.width, box.height);
+                ctx.fill();
+            } else {
+                ctx.fillStyle = "#8B4513"; 
+                ctx.fillRect(box.x, box.y, box.width, box.height);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = "#4a2500";
+                ctx.strokeRect(box.x, box.y, box.width, box.height);
+                // مسمار زينة في الصندوق
+                ctx.fillStyle = "#5c330a";
+                ctx.fillRect(box.x + 3, box.y + 3, 5, 5);
+                ctx.fillRect(box.x + box.width - 8, box.y + 3, 5, 5);
+                ctx.fillRect(box.x + 3, box.y + box.height - 8, 5, 5);
+                ctx.fillRect(box.x + box.width - 8, box.y + box.height - 8, 5, 5);
             }
         });
 
-        // الفوز
-        if (player.x > worldWidth - 150) {
-            this.physics.pause();
-            this.add.text(512, 250, 'فزت!', {fontSize:'80px', color:'#FFD700'}).setOrigin(0.5).setScrollFactor(0);
-            this.add.text(512, 350, 'اضغط هنا لإعادة اللعب', {fontSize:'40px', backgroundColor:'#fff', padding:{x:20,y:10}})
-                .setOrigin(0.5).setScrollFactor(0).setInteractive()
-                .on('pointerup', () => location.reload());
-            gameOver = true;
+        // الباب
+        ctx.fillStyle = "#222"; ctx.fillRect(door.x, door.y, door.width, door.height);
+
+        // --- رسم العملات الذهبية الفاخرة ---
+        var time = Date.now();
+        
+        coins.forEach(function(coin) { 
+            if (!coin.collected) { 
+                var centerX = coin.x + coin.width / 2;
+                var centerY = coin.y + coin.height / 2;
+                
+                // حساب الدوران (Scaling Width)
+                // نستخدم Math.sin لجعلها تعرض وتختفي كأنها تدور
+                var spin = Math.abs(Math.sin(time / 150)); 
+                var renderWidth = (coin.width / 2) * spin;
+                
+                // التدرج اللوني الذهبي (Gradient)
+                // يعطي إيحاء بالثلاثية الأبعاد واللمعان
+                var grad = ctx.createRadialGradient(centerX - renderWidth/3, centerY - 5, 2, centerX, centerY, coin.height/2);
+                grad.addColorStop(0, "white");       // لمعة قوية
+                grad.addColorStop(0.3, "#FFD700");   // ذهبي فاتح
+                grad.addColorStop(0.9, "#DAA520");   // ذهبي غامق
+                grad.addColorStop(1, "#B8860B");     // حواف بنية
+
+                ctx.beginPath();
+                ctx.fillStyle = grad;
+                // رسم بيضاوي متغير العرض
+                ctx.ellipse(centerX, centerY, renderWidth, coin.height/2, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // حدود ذهبية غامقة
+                ctx.strokeStyle = "#8B4513";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // وميض (Sparkle) يظهر كل فترة
+                if (Math.floor(time / 200) % 5 === 0) { // يظهر ويختفي
+                    ctx.fillStyle = "white";
+                    ctx.beginPath();
+                    // رسم نجمة رباعية بسيطة
+                    var sX = centerX + (Math.sin(time/100) * 10); // مكان الوميض يتحرك قليلا
+                    var sY = centerY - 8;
+                    ctx.moveTo(sX, sY - 4);
+                    ctx.lineTo(sX + 2, sY);
+                    ctx.lineTo(sX, sY + 4);
+                    ctx.lineTo(sX - 2, sY);
+                    ctx.fill();
+                }
+            } 
+        });
+
+        // الفيزياء
+        player.grounded = false;
+        for (var i = 0; i < boxes.length; i++) {
+            var dir = colCheck(player, boxes[i]);
+            if (dir === "l" || dir === "r") { player.velX = 0; player.jumping = false; }
+            else if (dir === "b") { player.grounded = true; player.jumping = false; if(boxes[i].type === 'lava') resetLevel(); }
+            else if (dir === "t") { player.velY *= -1; }
         }
+
+        if(player.grounded) player.velY = 0;
+        player.x += player.velX; player.y += player.velY;
+
+        // رسم اللاعب
+        ctx.fillStyle = player.color; ctx.fillRect(player.x, player.y, player.width, player.height);
+        ctx.fillStyle = "#ffe0bd"; ctx.fillRect(player.x+4, player.y+4, player.width-8, 12);
+        ctx.fillStyle = "black";
+        if(player.velX >= 0) ctx.fillRect(player.x+20, player.y+6, 4, 4);
+        else ctx.fillRect(player.x+6, player.y+6, 4, 4);
+
+        for (var i = 0; i < coins.length; i++) { if (!coins[i].collected && simpleCol(player, coins[i])) { coins[i].collected = true; score += 10; document.getElementById('coin-display').innerText = score; } }
+        if (simpleCol(player, door)) { currentLevel++; initLevel(currentLevel); }
+        if (player.y >= gameHeight) resetLevel();
+
+        requestAnimationFrame(update);
     }
 
-    function hitEnemy(p, e) {
-        if (p.body.touching.down && p.y < e.y - 20) {
-            e.destroy();
-            p.body.setVelocityY(-400);
-            score += 100;
-            scoreText.setText('النتيجة: '+score);
-        } else {
-            this.physics.pause();
-            this.add.text(512, 250, 'انتهت اللعبة!', {fontSize:'60px', color:'#ff0000'}).setOrigin(0.5).setScrollFactor(0);
-            this.add.text(512, 350, 'اضغط لإعادة اللعب', {fontSize:'40px', backgroundColor:'#fff', padding:{x:20,y:10}})
-                .setOrigin(0.5).setScrollFactor(0).setInteractive()
-                .on('pointerup', () => location.reload());
-            gameOver = true;
+    function resetLevel() { initLevel(currentLevel); }
+    function colCheck(shapeA, shapeB) {
+        var vX = (shapeA.x + (shapeA.width / 2)) - (shapeB.x + (shapeB.width / 2)),
+            vY = (shapeA.y + (shapeA.height / 2)) - (shapeB.y + (shapeB.height / 2)),
+            hWidths = (shapeA.width / 2) + (shapeB.width / 2),
+            hHeights = (shapeA.height / 2) + (shapeB.height / 2),
+            colDir = null;
+        if (Math.abs(vX) < hWidths && Math.abs(vY) < hHeights) {
+            var oX = hWidths - Math.abs(vX), oY = hHeights - Math.abs(vY);
+            if (oX >= oY) { if (vY > 0) { colDir = "t"; shapeA.y += oY; } else { colDir = "b"; shapeA.y -= oY; } } 
+            else { if (vX > 0) { colDir = "l"; shapeA.x += oX; } else { colDir = "r"; shapeA.x -= oX; } }
         }
+        return colDir;
     }
+    function simpleCol(a, b) { return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y; }
+
+    function setupTouch(id, k) {
+        var b = document.getElementById(id);
+        var handle = function(e){ e.preventDefault(); keys[k] = (e.type === 'touchstart' || e.type === 'mousedown'); if(keys[k]) b.classList.add('pressed'); else b.classList.remove('pressed'); };
+        ['touchstart', 'touchend', 'mousedown', 'mouseup', 'mouseleave'].forEach(evt => b.addEventListener(evt, handle, {passive: false}));
+    }
+    setupTouch("btn-left", 37); setupTouch("btn-right", 39); setupTouch("btn-jump", 38);
+
+    document.addEventListener("keydown", function (e) { keys[e.keyCode] = true; });
+    document.addEventListener("keyup", function (e) { keys[e.keyCode] = false; });
+})();
 </script>
+
 </body>
 </html>
