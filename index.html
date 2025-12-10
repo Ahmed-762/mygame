@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ماريو - الحجم المصغر</title>
+    <title>ماريو - الحركة السلسة</title>
     <style>
         body {
             background-color: #000;
@@ -122,12 +122,12 @@
         <canvas id="canvas" width="1280" height="720"></canvas>
         
         <div id="ui">
-            المستوى: <span id="level-display">1</span> | 💰: <span id="coin-display">0</span>
+            المستوى: <span id="level-display">1</span> / <span id="total-levels">0</span> | 💰: <span id="coin-display">0</span>
         </div>
 
         <div id="start-screen">
             <h1 style="font-size: 6vmin; margin: 0; color: #FFD700; text-shadow: 0 0 20px orange;">جمع الذهب</h1>
-            <button id="start-btn">ابدأ المغامرة</button>
+            <button id="start-btn">ابدأ اللعب</button>
         </div>
     </div>
 
@@ -136,11 +136,11 @@
             <div class="btn" id="btn-jump" style="background: rgba(231, 76, 60, 0.4);">▲</div>
         </div>
         <div class="control-group">
-            <div class="btn" id="btn-right">▶</div>
+             <div class="btn" id="btn-right">▶</div>
             <div class="btn" id="btn-left">◀</div>
-            >
+            
         </div>
-        
+
     </div>
 
 <script>
@@ -154,13 +154,12 @@
         gameWidth = 1280,
         gameHeight = 720;
 
-    // --- تم تعديل حجم اللاعب هنا ---
     var player = {
             x: 100,
             y: gameHeight - 100,
-            width: 20,  // تم التصغير من 30 إلى 20
-            height: 20, // تم التصغير من 30 إلى 20
-            speed: 7,
+            width: 16,  // تم التصغير إلى 16 لمنع الالتصاق بالحواف
+            height: 16, // تم التصغير إلى 16
+            speed: 7, 
             velX: 0,
             velY: 0,
             jumping: false,
@@ -169,7 +168,8 @@
         },
         keys = [],
         friction = 0.85,
-        gravity = 0.5,
+        gravity = 0.55,
+        jumpPower = 2.0,
         coins = [],
         boxes = [],
         clouds = [],
@@ -195,19 +195,20 @@
 
     // --- خرائط المراحل ---
     var levels = [
+        // المستوى 1
         [
             "########################################",
             "#                                      #",
             "#                                      #",
             "#                                      #",
-            "#                  OO                  #",
-            "#                 ####                 #",
+            "#                OO                    #",
+            "#               ####                   #",
             "#                                      #",
-            "#         OO              OO           #",
-            "#        ####            ####          #",
+            "#        OO              OO            #",
+            "#       ####            ####           #",
             "#                                      #",
             "#                                      #",
-            "#      ####                ####        #",
+            "#     ####                ####         #",
             "#                                      #",
             "#             OO  OO  OO               #",
             "#            ############              #",
@@ -219,78 +220,103 @@
             "#                                      #",
             "########################################"
         ],
+        // المستوى 2 (تم رفع المنصات لأعلى لتجنب الاصطدام بالرأس)
         [
             "########################################",
             "#D                                     #",
             "#####                                  #",
             "#                                      #",
-            "#            OO      OO     OO         #",
-            "#           ####    ####   ####        #",
             "#                                      #",
-            "#      OO                              #",
-            "#     ####                             #",
+            "#             OO         OO            #",
+            "#            ####       ####           #",
             "#                                      #",
-            "#            ####   ####   ####        #",
+            "#                                      #",
             "#                                      #",
             "#       OO                             #",
-            "#      ####                            #",
-            "#             !      !      !          #",
-            "#            ###    ###    ###         #",
+            "#      ####             OO             #",
+            "#                      ####            #",
             "#                                      #",
-            "# @     !                        !     #",
-            "########################################",
-            "#                                      #",
-            "#                                      #",
-            "########################################"
-        ],
-        [
-            "########################################",
-            "#                                     D#",
-            "#                                   ####",
-            "#OO                                    #",
-            "####                                   #",
-            "#                               O      #",
-            "#                              ###     #",
-            "#                                      #",
-            "#          OO          OO              #",
-            "#         ####        ####             #",
-            "#                                      #",
-            "#  @                                   #",
-            "#######                                #",
-            "#            OO    OO                  #",
-            "#           ####  ####                 #",
-            "#                                      #",
-            "#      !                 !             #",
-            "#     ###               ###            #",
-            "########################################",
-            "#                                      #",
-            "#                                      #",
-            "########################################"
-            ],
-        [
-            "########################################",
-            "#                                      #",
-            "#                 OO                   #",
-            "#                ####                  #",
-            "#                                      #",
-            "#          OO          OO              #",
-            "#         ####        ####             #",
-            "#                                      #",
-            "#    OO                          OO    #",
-            "#   ####                        ####   #",
-            "#                                      #",
-            "#             CONGRATULATIONS          #",
-            "#            YOU WON THE GAME          #",
-            "#                                      #",
-            "#                  D                   #",
-            "#                 ###                  #",
+            "#       !         !         !          #",
+            "#      ###       ###       ###         #",
             "#                                      #",
             "# @                                    #",
             "########################################",
             "########################################",
             "########################################",
             "########################################"
+        ],
+        // المستوى 3 (مفتوح)
+        [
+            "########################################",
+            "#                                     D#",
+            "#                                   ####",
+            "#OO                                    #",
+            "####              OO                   #",
+            "#                ####                  #",
+            "#                                      #",
+            "#         OO                           #",
+            "#        ####          OO              #",
+            "#                     ####             #",
+            "#  @                                   #",
+            "#######             ####               #",
+            "#            OO                        #",
+            "#           ####             OO        #",
+            "#                           ####       #",
+            "#      !           !                   #",
+            "#     ###         ###                  #",
+            "########################################",
+            "#                                      #",
+            "#                                      #",
+            "########################################"
+        ],
+        // المستوى 4 (قلعة)
+        [
+            "########################################",
+            "#D #                                   #",
+            "## #   OO                              #",
+            "## #  ####      OO                     #",
+            "## #           ####        OO          #",
+            "## #                      ####         #",
+            "## #           !  !  !                 #",
+            "## ########################            #",
+            "## #                                   #",
+            "## #     OO   OO   OO                  #",
+            "## #    ##############                 #",
+            "## #                                   #",
+            "## #                !                  #",
+            "## #               ###                 #",
+            "## #      !                            #",
+            "## #     ###             !             #",
+            "## #                    ###            #",
+            "#@ #                                   #",
+            "####                                   #",
+            "#                                      #",
+            "#!!!!!!!!!!!!!              !!!!!!!!!!!#",
+            "########################################"
+            
         ]
+        ,[  "########################################",
+            "#D #                                   #",
+            "## #   OO                              #",
+            "## #  ####      OO                     #",
+            "## #           ####        OO          #",
+            "## #                      ####         #",
+            "## #           !  !  !                 #",
+            "## ########################            #",
+            "## #                                   #",
+            "## #     OO   OO   OO                  #",
+            "## #    ##############                 #",
+            "## #                                   #",
+            "## #                !                  #",
+            "## #               ###                 #",
+            "## #      !                            #",
+            "## #     ###             !             #",
+            "## #                    ###            #",
+            "#@ #                                   #",
+            "####                                   #",
+            "#                                      #",
+            "#!!!!!!!!!!!!!              !!!!!!!!!!!#",
+            "########################################"]
     ];
 
     function startGame() {
@@ -299,6 +325,7 @@
         else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
         document.getElementById('start-screen').style.display = 'none';
         gameRunning = true;
+        document.getElementById('total-levels').innerText = levels.length;
         initLevel(0);
         update();
     }
@@ -306,7 +333,7 @@
 
     function initLevel(lvlIndex) {
         if (lvlIndex >= levels.length) {
-            alert("مبروك! أنهيت اللعبة. النقاط: " + score);
+            alert("مبروك! أنهيت جميع المراحل! النقاط: " + score);
             currentLevel = 0; score = 0; lvlIndex = 0;
         }
 
@@ -347,10 +374,12 @@
     function update() {
         if(!gameRunning) return;
 
+        // منطق القفز
         if (keys[38] || keys[32]) { 
             if (!player.jumping && player.grounded) {
-                player.jumping = true; player.grounded = false;
-                player.velY = -player.speed * 2.3;
+                player.jumping = true; 
+                player.grounded = false;
+                player.velY = -player.speed * jumpPower; 
             }
         }
         if (keys[39]) { if (player.velX < player.speed) player.velX++; }
@@ -360,7 +389,7 @@
         player.velY += gravity;
 
         // الخلفية
-        ctx.fillStyle = (currentLevel === 2) ? "#333" : "#5c94fc";
+        ctx.fillStyle = (currentLevel === 2) ? "#444" : "#5c94fc";
         ctx.fillRect(0, 0, gameWidth, gameHeight);
 
         // الغيوم
@@ -387,7 +416,6 @@
                 ctx.lineWidth = 2;
                 ctx.strokeStyle = "#4a2500";
                 ctx.strokeRect(box.x, box.y, box.width, box.height);
-                // مسمار زينة في الصندوق
                 ctx.fillStyle = "#5c330a";
                 ctx.fillRect(box.x + 3, box.y + 3, 5, 5);
                 ctx.fillRect(box.x + box.width - 8, box.y + 3, 5, 5);
@@ -399,7 +427,7 @@
         // الباب
         ctx.fillStyle = "#222"; ctx.fillRect(door.x, door.y, door.width, door.height);
 
-        // العملات اللامعة
+        // العملات
         var time = Date.now();
         coins.forEach(function(coin) { 
             if (!coin.collected) { 
@@ -436,30 +464,45 @@
             } 
         });
 
-        // الفيزياء
+        // الفيزياء والتصادم
         player.grounded = false;
+        var death = false;
+
         for (var i = 0; i < boxes.length; i++) {
             var dir = colCheck(player, boxes[i]);
-            if (dir === "l" || dir === "r") { player.velX = 0; player.jumping = false; }
-            else if (dir === "b") { player.grounded = true; player.jumping = false; if(boxes[i].type === 'lava') resetLevel(); }
-            else if (dir === "t") { player.velY *= -1; }
+            
+            if (dir && boxes[i].type === 'lava') {
+                death = true;
+            }
+
+            if (dir === "l" || dir === "r") { 
+                player.velX = 0; 
+                // لا نوقف القفز هنا
+            } else if (dir === "b") { 
+                player.grounded = true; 
+                player.jumping = false; 
+            } else if (dir === "t") { 
+                player.velY = 0; // تعديل هام: تصفير السرعة بدلاً من عكسها لمنع الارتداد للأسفل
+            }
+        }
+
+        if(death) {
+            resetLevel();
+            requestAnimationFrame(update);
+            return;
         }
 
         if(player.grounded) player.velY = 0;
         player.x += player.velX; player.y += player.velY;
 
-        // رسم اللاعب (تحديث الرسم ليناسب الحجم 20x20)
+        // رسم اللاعب
         ctx.fillStyle = player.color; 
         ctx.fillRect(player.x, player.y, player.width, player.height);
-        
-        // وجه اللاعب المصغر
         ctx.fillStyle = "#ffe0bd"; 
         ctx.fillRect(player.x + 3, player.y + 3, player.width - 6, 8);
-        
-        // العيون
         ctx.fillStyle = "black";
-        if(player.velX >= 0) ctx.fillRect(player.x + 14, player.y + 5, 3, 3); // ينظر يمين
-        else ctx.fillRect(player.x + 3, player.y + 5, 3, 3); // ينظر يسار
+        if(player.velX >= 0) ctx.fillRect(player.x + 10, player.y + 5, 3, 3);
+        else ctx.fillRect(player.x + 3, player.y + 5, 3, 3);
 
         for (var i = 0; i < coins.length; i++) { if (!coins[i].collected && simpleCol(player, coins[i])) { coins[i].collected = true; score += 10; document.getElementById('coin-display').innerText = score; } }
         if (simpleCol(player, door)) { currentLevel++; initLevel(currentLevel); }
