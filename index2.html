@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ماريو - الحجم المصغر</title>
+    <title>ماريو - الذهب اللامع</title>
     <style>
         body {
             background-color: #000;
@@ -138,7 +138,7 @@
         <div class="control-group">
             <div class="btn" id="btn-right">▶</div>
             <div class="btn" id="btn-left">◀</div>
-            >
+            
         </div>
         
     </div>
@@ -154,18 +154,9 @@
         gameWidth = 1280,
         gameHeight = 720;
 
-    // --- تم تعديل حجم اللاعب هنا ---
     var player = {
-            x: 100,
-            y: gameHeight - 100,
-            width: 20,  // تم التصغير من 30 إلى 20
-            height: 20, // تم التصغير من 30 إلى 20
-            speed: 7,
-            velX: 0,
-            velY: 0,
-            jumping: false,
-            grounded: false,
-            color: '#E70011'
+            x: 100, y: gameHeight - 100, width: 30, height: 30,
+            speed: 7, velX: 0, velY: 0, jumping: false, grounded: false, color: '#E70011'
         },
         keys = [],
         friction = 0.85,
@@ -330,6 +321,7 @@
                 } else if (type === '!') {
                     boxes.push({ x: x, y: y + (tileSizeY/2), width: tileSizeX, height: tileSizeY/2, type: 'lava' });
                 } else if (type === 'O') {
+                    // حجم العملة الفعلي للتصادم
                     coins.push({ x: x + 10, y: y + 10, width: tileSizeX - 20, height: tileSizeY - 20, collected: false });
                 } else if (type === 'D') {
                     door = { x: x, y: y, width: tileSizeX, height: tileSizeY };
@@ -374,7 +366,7 @@
             if(cloud.x > gameWidth + 100) cloud.x = -100;
         });
 
-        // الأرضية
+        // الأرضية (الصناديق البنية)
         boxes.forEach(function(box) {
             ctx.beginPath();
             if(box.type === 'lava') {
@@ -399,33 +391,44 @@
         // الباب
         ctx.fillStyle = "#222"; ctx.fillRect(door.x, door.y, door.width, door.height);
 
-        // العملات اللامعة
+        // --- رسم العملات الذهبية الفاخرة ---
         var time = Date.now();
+        
         coins.forEach(function(coin) { 
             if (!coin.collected) { 
                 var centerX = coin.x + coin.width / 2;
                 var centerY = coin.y + coin.height / 2;
+                
+                // حساب الدوران (Scaling Width)
+                // نستخدم Math.sin لجعلها تعرض وتختفي كأنها تدور
                 var spin = Math.abs(Math.sin(time / 150)); 
                 var renderWidth = (coin.width / 2) * spin;
                 
+                // التدرج اللوني الذهبي (Gradient)
+                // يعطي إيحاء بالثلاثية الأبعاد واللمعان
                 var grad = ctx.createRadialGradient(centerX - renderWidth/3, centerY - 5, 2, centerX, centerY, coin.height/2);
-                grad.addColorStop(0, "white");
-                grad.addColorStop(0.3, "#FFD700");
-                grad.addColorStop(0.9, "#DAA520");
-                grad.addColorStop(1, "#B8860B");
+                grad.addColorStop(0, "white");       // لمعة قوية
+                grad.addColorStop(0.3, "#FFD700");   // ذهبي فاتح
+                grad.addColorStop(0.9, "#DAA520");   // ذهبي غامق
+                grad.addColorStop(1, "#B8860B");     // حواف بنية
 
                 ctx.beginPath();
                 ctx.fillStyle = grad;
+                // رسم بيضاوي متغير العرض
                 ctx.ellipse(centerX, centerY, renderWidth, coin.height/2, 0, 0, Math.PI * 2);
                 ctx.fill();
+                
+                // حدود ذهبية غامقة
                 ctx.strokeStyle = "#8B4513";
                 ctx.lineWidth = 1;
                 ctx.stroke();
 
-                if (Math.floor(time / 200) % 5 === 0) {
+                // وميض (Sparkle) يظهر كل فترة
+                if (Math.floor(time / 200) % 5 === 0) { // يظهر ويختفي
                     ctx.fillStyle = "white";
                     ctx.beginPath();
-                    var sX = centerX + (Math.sin(time/100) * 10);
+                    // رسم نجمة رباعية بسيطة
+                    var sX = centerX + (Math.sin(time/100) * 10); // مكان الوميض يتحرك قليلا
                     var sY = centerY - 8;
                     ctx.moveTo(sX, sY - 4);
                     ctx.lineTo(sX + 2, sY);
@@ -448,18 +451,12 @@
         if(player.grounded) player.velY = 0;
         player.x += player.velX; player.y += player.velY;
 
-        // رسم اللاعب (تحديث الرسم ليناسب الحجم 20x20)
-        ctx.fillStyle = player.color; 
-        ctx.fillRect(player.x, player.y, player.width, player.height);
-        
-        // وجه اللاعب المصغر
-        ctx.fillStyle = "#ffe0bd"; 
-        ctx.fillRect(player.x + 3, player.y + 3, player.width - 6, 8);
-        
-        // العيون
+        // رسم اللاعب
+        ctx.fillStyle = player.color; ctx.fillRect(player.x, player.y, player.width, player.height);
+        ctx.fillStyle = "#ffe0bd"; ctx.fillRect(player.x+4, player.y+4, player.width-8, 12);
         ctx.fillStyle = "black";
-        if(player.velX >= 0) ctx.fillRect(player.x + 14, player.y + 5, 3, 3); // ينظر يمين
-        else ctx.fillRect(player.x + 3, player.y + 5, 3, 3); // ينظر يسار
+        if(player.velX >= 0) ctx.fillRect(player.x+20, player.y+6, 4, 4);
+        else ctx.fillRect(player.x+6, player.y+6, 4, 4);
 
         for (var i = 0; i < coins.length; i++) { if (!coins[i].collected && simpleCol(player, coins[i])) { coins[i].collected = true; score += 10; document.getElementById('coin-display').innerText = score; } }
         if (simpleCol(player, door)) { currentLevel++; initLevel(currentLevel); }
